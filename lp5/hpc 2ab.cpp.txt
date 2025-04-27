@@ -1,0 +1,208 @@
+#include<iostream>
+#include<stdlib.h>
+#include<omp.h>  // OpenMP library for parallel programming
+using namespace std;
+
+// ---------------- Swap Function ----------------
+// Function to swap two integers
+void swap(int &a, int &b)
+{
+    int temp = a;
+    a = b;
+    b = temp;
+}
+
+// ---------------- Parallel Bubble Sort Function ----------------
+// Function to perform Bubble Sort using OpenMP
+void bubble(int *a, int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        int first = i % 2;  // 'first' decides whether we do even-index or odd-index comparisons
+
+        // Parallelize inner loop: compare and swap elements
+        #pragma omp parallel for
+        for (int j = first; j < n - 1; j += 2)
+        {
+            if (a[j] > a[j + 1])
+            {
+                swap(a[j], a[j + 1]);
+            }
+        }
+    }
+}
+
+// ---------------- Merge Function ----------------
+// Helper function to merge two sorted parts of an array
+void marge(int a[], int i1, int j1, int i2, int j2)
+{
+    int i = i1;
+    int j = i2;
+    int temp[10000];  // Temporary array to store merged elements
+    int k = 0;
+
+    // Compare elements of both parts and store the smaller one in temp[]
+    while (i <= j1 && j <= j2)
+    {
+        if (a[i] < a[j])
+            temp[k++] = a[i++];
+        else
+            temp[k++] = a[j++];
+    }
+
+    // Copy remaining elements from first half if any
+    while (i <= j1)
+        temp[k++] = a[i++];
+
+    // Copy remaining elements from second half if any
+    while (j <= j2)
+        temp[k++] = a[j++];
+
+    // Copy temp array back to the original array
+    for (i = i1, j = 0; i <= j2; i++, j++)
+        a[i] = temp[j];
+}
+
+// ---------------- Parallel Merge Sort Function ----------------
+// Function to perform Merge Sort using OpenMP sections
+void margesort(int a[], int i, int j)
+{
+    int mid;
+    if (i < j)
+    {
+        mid = (i + j) / 2;
+        
+        // Create parallel sections to sort both halves concurrently
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            margesort(a, i, mid);
+
+            #pragma omp section
+            margesort(a, mid + 1, j);
+        }
+
+        // Merge the sorted halves
+        marge(a, i, mid, mid + 1, j);
+    }
+}
+
+// ---------------- Sequential Merge Sort Function ----------------
+// Regular recursive Merge Sort without parallelization
+void margeSort_seq(int a[], int i, int j)
+{
+    int mid;
+    if (i < j)
+    {
+        mid = (i + j) / 2;
+        margeSort_seq(a, i, mid);
+        margeSort_seq(a, mid + 1, j);
+        marge(a, i, mid, mid + 1, j);
+    }
+}
+
+// ---------------- Main Function ----------------
+int main()
+{
+    int choice;
+    cout << "Choose Option:\n1. Parallel Bubble Sort\n2. Parallel Merge Sort\nEnter your choice: ";
+    cin >> choice;  // User selects which program to run
+
+    if (choice == 1)
+    {
+        // ------------- Bubble Sort Part -------------
+        int *a, *b, n = 10000;  // Large array size for timing comparison
+        a = new int[n];
+        b = new int[n];
+
+        // Initialize both arrays with the same random values
+        for (int i = 0; i < n; i++)
+        {
+            a[i] = rand() % 10000;
+            b[i] = a[i];
+        }
+
+        // Sequential Bubble Sort (for timing)
+        double start_seq = omp_get_wtime();
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < n - 1; j++)
+            {
+                if (b[j] > b[j + 1])
+                {
+                    swap(b[j], b[j + 1]);
+                }
+            }
+        }
+        double end_seq = omp_get_wtime();
+
+        // Parallel Bubble Sort
+        double start_par = omp_get_wtime();
+        bubble(a, n);
+        double end_par = omp_get_wtime();
+
+        // Display the sorted output (first 20 elements for checking)
+        cout << "\n--- Bubble Sort Results (First 20 Elements) ---\n";
+        for (int i = 0; i < 20; i++)
+            cout << a[i] << " ";
+        cout << endl;
+
+        // Display execution times
+        cout << "\nSequential Bubble Sort Time: " << (end_seq - start_seq) << " seconds\n";
+        cout << "Parallel Bubble Sort Time: " << (end_par - start_par) << " seconds\n";
+
+        // Free dynamically allocated memory
+        delete[] a;
+        delete[] b;
+    }
+    else if (choice == 2)
+    {
+        // ------------- Merge Sort Part -------------
+        int *a, *b, n = 1000;  // Array size smaller to handle recursive calls
+        a = new int[n];
+        b = new int[n];
+
+        // Initialize both arrays with the same random values
+        for (int i = 0; i < n; i++)
+        {
+            a[i] = rand() % 1000;
+            b[i] = a[i];
+        }
+
+        // Display original array (first 20 elements)
+        cout << "\nOriginal Array (First 20 Elements):\n";
+        for (int i = 0; i < 20; i++)
+            cout << a[i] << " ";
+        cout << endl;
+
+        // Parallel Merge Sort
+        double start_par = omp_get_wtime();
+        margesort(a, 0, n - 1);
+        double end_par = omp_get_wtime();
+
+        // Sequential Merge Sort
+        double start_seq = omp_get_wtime();
+        margeSort_seq(b, 0, n - 1);
+        double end_seq = omp_get_wtime();
+
+        // Display sorted array (first 20 elements)
+        cout << "\nSorted Array After Parallel Merge Sort (First 20 Elements):\n";
+        for (int i = 0; i < 20; i++)
+            cout << a[i] << " ";
+        cout << endl;
+
+        // Display execution times
+        cout << "\nParallel Merge Sort Time: " << (end_par - start_par) << " seconds\n";
+        cout << "Sequential Merge Sort Time: " << (end_seq - start_seq) << " seconds\n";
+
+        // Free dynamically allocated memory
+        delete[] a;
+        delete[] b;
+    }
+    else
+    {
+        cout << "Invalid choice! Please enter 1 or 2." << endl;
+    }
+
+    return 0;
+}
