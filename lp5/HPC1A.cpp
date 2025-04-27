@@ -1,106 +1,95 @@
-#include<iostream>     // For input/output operations
-#include<queue>        // For using queue data structure
-#include<stdlib.h>     // Standard library (though not directly needed here)
-#include<omp.h>        // OpenMP library for parallelism
+#include <iostream>    // For input/output operations
+#include <queue>       // For using the queue data structure
+#include <vector>      // For dynamic array to store current level nodes
+#include <omp.h>       // For OpenMP (parallel processing)
 
 using namespace std;
 
-// Class definition for a binary tree node
+// Node class for binary tree
 class node {
 public:
-    node *left;        // Pointer to left child
-    node *right;       // Pointer to right child
-    int data;          // Data stored in node
-};
-
-// Class definition for BFS operations
-class BFS {
-public:
-    node *insert(node*, int);   // Function to insert a node into the tree
-    void BFS_Fuction(node*);    // Function to perform BFS traversal
-};
-
-// Function to insert a node into BST
-node* insert(node* root, int data) 
-{
-    if (root == NULL) {
-        root = new node;
-        root->data = data;
-        root->left = root->right = NULL;
-        return root;
+    int data;          // Value stored in the node
+    node* left;        // Pointer to left child
+    node* right;       // Pointer to right child
+    
+    // Constructor to create a new node
+    node(int val) {
+        data = val;
+        left = right = nullptr;
     }
+};
 
+// Function to insert a value into the BST
+node* insert(node* root, int data) {
+    if (root == nullptr) {
+        return new node(data);    // If tree is empty, create a new node
+    }
     if (data < root->data)
-        root->left = insert(root->left, data);
+        root->left = insert(root->left, data);   // Insert into left subtree
     else
-        root->right = insert(root->right, data);
+        root->right = insert(root->right, data); // Insert into right subtree
 
-    return root;
+    return root;    // Return the unchanged root node
 }
 
-// Function to perform Breadth-First Search (BFS) using OpenMP parallelism
-void BFS_Fuction(node* head)
-{
-    queue<node*> q;    // Create a queue for BFS
-    q.push(head);      // Push root node into queue
-    int qsize;         // Variable to hold current queue size
+// Function to perform Breadth-First Search (BFS) traversal in parallel
+void BFS_Function(node* head) {
+    if (head == nullptr) return;  // If tree is empty, exit
 
-    while (!q.empty())
-    {
-        qsize = q.size();    // Number of nodes in the current level
+    queue<node*> q;     // Queue to manage nodes at each level
+    q.push(head);       // Start by pushing root into the queue
 
-        // Parallel processing of nodes in the queue
+    while (!q.empty()) {
+        int levelSize = q.size();   // Number of nodes at current level
+
+        vector<node*> currentLevel; // Temporary array to store nodes of current level
+
+        // Extract all nodes of the current level into a vector
+        for (int i = 0; i < levelSize; ++i) {
+            node* currNode = q.front();
+            q.pop();
+            currentLevel.push_back(currNode);
+        }
+
+        // Parallel print all nodes in the current level
         #pragma omp parallel for
-        for (int i = 0; i < q.size(); i++) // Note: q.size() can change inside loop (unsafe)
-        {
-            node *currNode;
+        for (int i = 0; i < currentLevel.size(); ++i) {
+            cout << "\t" << currentLevel[i]->data;
+        }
 
-            // Critical section to safely pop from queue
-            #pragma omp critical
-            {
-                currNode = q.front();  // Get front node
-                q.pop();               // Remove front node
-                cout << "\t" << currNode->data; // Print node data
-            }
-
-            // Critical section to safely push child nodes into queue
-            #pragma omp critical
-            {
-                if (currNode->left) {
-                    q.push(currNode->left);  // Enqueue left child
-                }
-                if (currNode->right) {
-                    q.push(currNode->right); // Enqueue right child
-                }
-            }
+        // Sequentially enqueue children of all nodes
+        for (int i = 0; i < currentLevel.size(); ++i) {
+            if (currentLevel[i]->left)
+                q.push(currentLevel[i]->left);    // Push left child if exists
+            if (currentLevel[i]->right)
+                q.push(currentLevel[i]->right);   // Push right child if exists
         }
     }
 }
 
 // Main function
-int main()
-{
-    node *root = NULL;   // Initialize root pointer
-    int num;             // To store node value
-    char ans;            // (Unused in the code)
-    int n;               // Number of nodes
+int main() {
+    node* root = nullptr;    // Initialize empty root
+    int num;                 // Variable to hold user input for node value
+    int n;                   // Number of nodes to insert
 
-    cout << "How many nodes"; // Ask user for number of nodes
+    cout << "How many nodes? ";  // Ask user for number of nodes
     cin >> n;
 
-    // Insert n nodes into the BST
-    for (int i = 0; i < n; i++)
-    {
-        cout << "Enter the code " << i;
+    // Loop to take input and insert into BST
+    for (int i = 0; i < n; i++) {
+        cout << "Enter node value " << i+1 << ": ";
         cin >> num;
-        root = insert(root, num);
+        root = insert(root, num);  // Insert each number into the tree
     }
 
-    double start = omp_get_wtime(); // Start timing
-    BFS_Fuction(root);              // Perform BFS traversal
-    double end = omp_get_wtime();    // End timing
+    double start = omp_get_wtime(); // Start the timer
+    BFS_Function(root);             // Perform BFS traversal
+    double end = omp_get_wtime();    // End the timer
 
-    cout << "\nExecution Time: " << (end - start) << " seconds\n"; // Output execution time
+    cout << "\nExecution Time: " << (end - start) << " seconds\n"; // Print time taken
+
+    return 0; // End program
 }
 
 
@@ -108,54 +97,156 @@ int main()
 
 
 
-//This code implements a basic Binary Search Tree (BST) with Breadth-First Search (BFS) traversal, using parallel processing with OpenMP to speed up the BFS traversal. Let me explain it in simpler terms:
 
-### What the Code Does:
-1. **Binary Tree Setup**: It creates a binary tree, where each node has a left and right child, as well as data.
-2. **BFS Traversal**: The BFS algorithm is used to traverse the tree level by level. Each node at a certain level is processed before moving to the next level.
-3. **Parallel Processing**: The BFS operation is sped up using OpenMP parallelism, which allows parts of the algorithm to run in parallel (at the same time), thus reducing execution time.
 
-### Step-by-Step Explanation:
 
-1. **Includes Libraries**:
-   - `iostream`: For input/output operations.
-   - `queue`: To use a queue (FIFO) for BFS.
-   - `stdlib.h`: Standard library (not used here directly).
-   - `omp.h`: OpenMP library for parallel processing.
 
-2. **Node Structure**:
-   - A `node` class is defined with three parts:
-     - `left`: Pointer to the left child.
-     - `right`: Pointer to the right child.
-     - `data`: The value stored in the node.
+//Of course! Let’s explain it in **super simple language** — like I’m teaching you personally. 🧠✨
 
-3. **BFS Class**:
-   - This class contains two methods:
-     - `insert`: To insert a new node into the tree.
-     - `BFS_Fuction`: To perform the BFS traversal and print node values.
+---
 
-4. **Insert Function**:
-   - This function inserts a new node into the binary search tree.
-   - It places values smaller than the current node to the left and larger values to the right.
+# 🌳 What This Program Does
 
-5. **BFS_Fuction (Breadth-First Search)**:
-   - A queue is used to process nodes level by level.
-   - It starts by pushing the root node into the queue.
-   - For each node, it processes its left and right children, adding them to the queue for future processing.
-   - The BFS traversal is parallelized using OpenMP. It processes nodes in parallel at each level of the tree.
+- It builds a **Binary Search Tree (BST)** from numbers you enter.
+- Then it **travels level-by-level** (BFS — Breadth-First Search) through the tree.
+- It **prints all the values** nicely.
+- It also **measures how fast** the BFS happens using **OpenMP** (parallel computing).
 
-6. **Parallelization**:
-   - The line `#pragma omp parallel for` is where the parallel processing happens. However, there’s a potential issue because `q.size()` can change while iterating through the queue (unsafe), and OpenMP doesn’t handle that well in this case.
-   - The critical sections (`#pragma omp critical`) ensure that only one thread at a time can modify the queue, which avoids data corruption.
+---
 
-7. **Main Function**:
-   - The main function first asks the user how many nodes they want to insert.
-   - It then inserts these nodes into the binary search tree.
-   - Finally, it calls `BFS_Fuction` to print the nodes level by level.
-   - It also measures and prints the execution time of the BFS operation.
+# 🧩 Step-by-Step Simple Explanation
 
-### Potential Issues:
-- The loop in `BFS_Fuction` (`for (int i = 0; i < q.size(); i++)`) is problematic because `q.size()` may change during the loop (as items are popped from the queue). This can cause undefined behavior. A safer way would be to queue nodes in a separate step and then process them.
+---
 
-### Summary:
-This program creates a binary tree, performs a breadth-first traversal to visit all the nodes, and attempts to speed up the traversal using parallel processing with OpenMP. However, there's a minor issue with how the queue is handled in parallel processing.
+## 1. **Start with basic things**
+
+- We include `iostream`, `queue`, `vector`, and `omp.h` libraries.
+- `queue` helps us go **level-by-level**.
+- `vector` is used to store nodes at each level temporarily.
+- `omp.h` lets the CPU **work faster** by doing many things at once.
+
+---
+
+## 2. **Node: Building Block of the Tree**
+
+We have a **node class**:
+
+```cpp
+class node {
+public:
+    int data;
+    node* left;
+    node* right;
+};
+```
+
+Each node has:
+- a **data** value (number),
+- a **left child** (smaller value),
+- a **right child** (bigger value).
+
+---
+
+## 3. **Insert: Adding Values to the Tree**
+
+```cpp
+node* insert(node* root, int data)
+```
+
+- If the tree is **empty**, we create a new node.
+- If the number is **smaller**, go to the **left side**.
+- If the number is **bigger**, go to the **right side**.
+- This is called making a **Binary Search Tree (BST)**.
+
+Example:
+- Insert 10 → 10 is root.
+- Insert 5 → smaller → left of 10.
+- Insert 15 → bigger → right of 10.
+
+---
+
+## 4. **BFS_Function: Travelling the Tree**
+
+```cpp
+void BFS_Function(node* head)
+```
+
+This function **visits nodes level-by-level**:
+
+- Use a **queue**:
+  - Start by putting the root node into it.
+- While the queue is not empty:
+  - Pull out all nodes at the **current level**.
+  - Print their values **(using OpenMP to make it faster)**.
+  - Then push their **children** (left and right) into the queue for the next level.
+
+So it goes:
+```
+Root → Children → Grandchildren → etc.
+```
+
+---
+✅ **Important:**  
+- **Queue** is used to keep track of *"what to visit next"*.
+- **OpenMP** is only used for *printing* nodes faster (not for pushing/popping queue — that’s risky).
+
+---
+
+## 5. **Main Function: Running Everything**
+
+```cpp
+int main()
+```
+
+- Ask the user: "How many nodes do you want to add?"
+- For each node:
+  - Ask for a number.
+  - Insert it into the tree using `insert()`.
+- Then:
+  - Start a timer (`start`).
+  - Run the `BFS_Function()` to print nodes.
+  - Stop the timer (`end`).
+- Finally:
+  - Print how much time it took.
+
+---
+
+# 📋 Small Example
+
+User input:
+
+```
+How many nodes? 3
+Enter node value 1: 10
+Enter node value 2: 5
+Enter node value 3: 20
+```
+
+Tree looks like:
+
+```
+    10
+   /   \
+  5    20
+```
+
+Printed output (level by level):
+
+```
+    10    5    20
+Execution Time: 0.0001 seconds
+```
+
+---
+
+# 🏁 In short:
+
+- Build a tree 🌳
+- Visit level-by-level ➡️➡️
+- Print values ✍️
+- Measure time 🕒
+
+---
+Would you like me to also show a **hand-drawn diagram** of how nodes move through the queue during BFS? 📈  
+It’ll be very easy to understand in 1 picture! 🎨  
+Want it?  🚀
